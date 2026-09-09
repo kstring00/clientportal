@@ -143,6 +143,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const patch: Record<string, unknown> = {};
+  const requestedPhase = body?.phase;
 
   if (typeof body?.status === "string") {
     if (!["active", "paused", "complete", "archived"].includes(body.status)) {
@@ -151,14 +152,17 @@ export async function PATCH(request: NextRequest) {
     patch.status = body.status;
   }
 
-  if (body?.phase !== undefined) {
-    if (body.phase !== null && !portalConfig.phases.some((phase) => phase.key === body.phase)) {
+  if (requestedPhase !== undefined) {
+    if (
+      requestedPhase !== null &&
+      !portalConfig.phases.some((phase) => phase.key === requestedPhase)
+    ) {
       return NextResponse.json({ error: "Invalid project phase." }, { status: 400 });
     }
-    patch.phase = body.phase;
+    patch.phase = requestedPhase;
   }
 
-  const textFields: [keyof NonNullable<typeof body>, string][] = [
+  const textFields = [
     ["summary", "summary"],
     ["scopeSummary", "scope_summary"],
     ["currentFocus", "current_focus"],
@@ -166,7 +170,7 @@ export async function PATCH(request: NextRequest) {
     ["nextActionDue", "next_action_due"],
     ["nextMilestone", "next_milestone"],
     ["nextMilestoneAt", "next_milestone_at"],
-  ];
+  ] as const;
 
   for (const [input, column] of textFields) {
     const value = body?.[input];
@@ -177,7 +181,11 @@ export async function PATCH(request: NextRequest) {
 
   if (body?.agreedTotal !== undefined) {
     if (body.agreedTotal === null) patch.agreed_total = null;
-    else if (typeof body.agreedTotal === "number" && Number.isFinite(body.agreedTotal) && body.agreedTotal >= 0) {
+    else if (
+      typeof body.agreedTotal === "number" &&
+      Number.isFinite(body.agreedTotal) &&
+      body.agreedTotal >= 0
+    ) {
       patch.agreed_total = body.agreedTotal;
     } else {
       return NextResponse.json({ error: "Invalid agreed total." }, { status: 400 });
@@ -198,15 +206,18 @@ export async function PATCH(request: NextRequest) {
       },
     );
 
-    if (body?.phase !== undefined) {
+    if (requestedPhase !== undefined) {
+      const phaseLabel = requestedPhase
+        ? portalConfig.phases.find((phase) => phase.key === requestedPhase)?.label ?? requestedPhase
+        : null;
       await adminRest("project_activity", {
         method: "POST",
         body: JSON.stringify({
           project_id: projectId,
           actor_id: session.profile.id,
           kind: "phase_changed",
-          summary: body.phase
-            ? `Project phase changed to ${portalConfig.phases.find((p) => p.key === body.phase)?.label ?? body.phase}`
+          summary: phaseLabel
+            ? `Project phase changed to ${phaseLabel}`
             : "Project phase cleared",
         }),
       }).catch(() => undefined);
