@@ -1,5 +1,4 @@
 import { existsSync, statSync } from "node:fs";
-import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = new URL("../", import.meta.url);
@@ -13,17 +12,22 @@ function existingUrl(base) {
     if (stat.isFile()) return base.href;
     if (stat.isDirectory()) {
       for (const extension of EXTENSIONS) {
-        const index = new URL(`index${extension}`, base.href.endsWith("/") ? base : `${base.href}/`);
+        const index = new URL(
+          `index${extension}`,
+          base.href.endsWith("/") ? base : `${base.href}/`,
+        );
         if (existsSync(fileURLToPath(index))) return index.href;
       }
     }
   }
 
-  if (!extname(path)) {
-    for (const extension of EXTENSIONS) {
-      const candidate = new URL(`${base.href}${extension}`);
-      if (existsSync(fileURLToPath(candidate))) return candidate.href;
-    }
+  // TypeScript module names can legitimately contain dots before the extension
+  // (`portal.config.ts`), so `path.extname()` cannot tell us whether the import
+  // already contains a real source extension. If the exact path did not exist,
+  // try the known source extensions unconditionally.
+  for (const extension of EXTENSIONS) {
+    const candidate = new URL(`${base.href}${extension}`);
+    if (existsSync(fileURLToPath(candidate))) return candidate.href;
   }
 
   return null;
