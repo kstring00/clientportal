@@ -10,6 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --import ./tests/register.mjs --test --experimental-strip-types tests/*.test.ts",
+    "webhook:stub": "node scripts/webhook-stub.mjs",
     "test:webhook": "node scripts/webhook-check.mjs",
     "verify": "npm run typecheck && npm run test"
   },
