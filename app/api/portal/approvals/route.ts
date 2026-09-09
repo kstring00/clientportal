@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import type { PortalApproval } from "@/lib/portal/types";
-import { userRest } from "@/lib/supabase/rest";
+import { PortalRestError, userRest } from "@/lib/supabase/rest";
 import { getPortalSession } from "@/lib/supabase/session";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Row = Record<string, unknown>;
 
 function str(row: Row, key: string) {
@@ -22,15 +20,11 @@ function embeddedName(row: Row, fallback: string) {
   return fallback;
 }
 
-async function shapeApproval(
-  approvalId: string,
-  accessToken: string,
-): Promise<PortalApproval | null> {
+async function shapeApproval(approvalId: string, accessToken: string): Promise<PortalApproval | null> {
   const approvals = await userRest<Row[]>(
     `approvals?id=eq.${encodeURIComponent(approvalId)}&select=*,users!approvals_decided_by_fkey(name)&limit=1`,
     accessToken,
   ).catch(() => []);
-
   const row = approvals[0];
   if (!row) return null;
 
@@ -51,8 +45,7 @@ async function shapeApproval(
     decidedByName: embeddedName(row, "") || null,
     history: events.map((event) => ({
       id: str(event, "id") ?? "",
-      decision: (str(event, "decision") ?? "requested") as
-        PortalApproval["history"][number]["decision"],
+      decision: (str(event, "decision") ?? "requested") as PortalApproval["history"][number]["decision"],
       actorName: embeddedName(event, "Someone"),
       comment: str(event, "comment"),
       createdAt: str(event, "created_at") ?? "",
@@ -62,107 +55,51 @@ async function shapeApproval(
 
 export async function POST(request: NextRequest) {
   const session = await getPortalSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
-  let payload: {
-    approvalId?: unknown;
-    decision?: unknown;
-    comment?: unknown;
-  };
+  const payload = (await request.json().catch(() => null)) as
+    | { approvalId?: unknown; decision?: unknown; comment?: unknown }
+    | null;
+  if (!payload) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
-  try {
-    payload = (await request.json()) as typeof payload;
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
-
-  const approvalId =
-    typeof payload.approvalId === "string" ? payload.approvalId : "";
-  const decision =
-    payload.decision === "approved" || payload.decision === "changes_requested"
-      ? payload.decision
-      : null;
+  const approvalId = typeof payload.approvalId === "string" ? payload.approvalId : "";
+  const decision = payload.decision === "approved" || payload.decision === "changes_requested"
+    ? payload.decision
+    : null;
   const comment = typeof payload.comment === "string" ? payload.comment.trim() : "";
 
   if (!UUID_RE.test(approvalId) || !decision || comment.length > 4000) {
     return NextResponse.json({ error: "Invalid decision." }, { status: 400 });
   }
 
-  // Resolve the approval under the user's token before writing. RLS hides every
-  // approval outside their projects. Only a waiting approval can be decided from
-  // the client UI; a second submission after it has already moved is a conflict,
-  // not a fresh history event.
   const visible = await userRest<Row[]>(
-    `approvals?id=eq.${encodeURIComponent(approvalId)}&select=id,project_id,status&limit=1`,
+    `approvals?id=eq.${encodeURIComponent(approvalId)}&select=id,status&limit=1`,
     session.accessToken,
   ).catch(() => []);
-
   const current = visible[0];
-  if (!current) {
-    return NextResponse.json({ error: "Approval not found." }, { status: 404 });
-  }
-
+  if (!current) return NextResponse.json({ error: "Approval not found." }, { status: 404 });
   if (str(current, "status") !== "waiting") {
-    return NextResponse.json(
-      { error: "That approval has already been decided." },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: "That approval has already been decided." }, { status: 409 });
   }
-
-  const projectId = str(current, "project_id");
-  if (!projectId) {
-    return NextResponse.json({ error: "Approval not found." }, { status: 404 });
-  }
-
-  const decidedAt = new Date().toISOString();
 
   try {
-    // The approval row is the cheap current-state summary; approval_events is
-    // the permanent append-only record. Both writes use the caller's token, so
-    // the database still enforces project membership and actor attribution.
-    const updated = await userRest<Row[]>(
-      `approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.waiting`,
-      session.accessToken,
-      {
-        method: "PATCH",
-        returnRepresentation: true,
-        body: JSON.stringify({
-          status: decision,
-          decided_at: decidedAt,
-          decided_by: session.profile.id,
-        }),
-      },
-    );
-
-    if (!updated[0]) {
-      return NextResponse.json(
-        { error: "That approval has already been decided." },
-        { status: 409 },
-      );
-    }
-
-    await userRest("approval_events", session.accessToken, {
+    await userRest("rpc/portal_decide_approval", session.accessToken, {
       method: "POST",
       body: JSON.stringify({
-        approval_id: approvalId,
-        project_id: projectId,
-        actor_id: session.profile.id,
-        decision,
-        comment: comment || null,
+        p_approval_id: approvalId,
+        p_decision: decision,
+        p_comment: comment || null,
       }),
     });
 
     const approval = await shapeApproval(approvalId, session.accessToken);
     if (!approval) throw new Error("Updated approval could not be reloaded.");
-
     return NextResponse.json({ approval });
   } catch (error) {
     console.error("Portal approval decision failed", error);
-    return NextResponse.json(
-      { error: "That decision could not be recorded." },
-      { status: 500 },
-    );
+    if (error instanceof PortalRestError && /already been decided/i.test(error.detail)) {
+      return NextResponse.json({ error: "That approval has already been decided." }, { status: 409 });
+    }
+    return NextResponse.json({ error: "That decision could not be recorded." }, { status: 500 });
   }
 }
