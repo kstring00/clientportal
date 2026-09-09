@@ -54,6 +54,7 @@ Apply the migrations in order:
 2. `0002_portal_modules.sql`
 3. `0003_billing_and_handoff_gate.sql`
 4. `0004_portal_rls.sql`
+5. `0005_message_read_isolation.sql`
 
 The result is a complete blank portal database, including the private `portal-files` Storage bucket and RLS policies.
 
