@@ -1,0 +1,154 @@
+/* The walkthrough.
+
+   A centred dialog rather than tooltips pinned to elements. Anchored tooltips
+   break when the thing they point at is off-screen, inside a scroll container,
+   or — as here — moves to a bottom bar on a phone. A dialog behaves identically
+   at 375px and 1440px, and is far easier to make correct for a screen reader. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(5, 23, 47, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  animation: fade var(--motion) var(--ease);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  width: min(34rem, 100%);
+  max-height: min(90dvh, 42rem);
+  overflow-y: auto;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  animation: rise var(--motion) var(--ease);
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Reduced motion: no entrance movement at all. The globals.css rule already
+   collapses durations, but the transform is removed explicitly so nothing
+   shifts under someone who asked for stillness. */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop, .card { animation: none; }
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.pips {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.pip {
+  height: 3px;
+  flex: 1;
+  background: var(--line-strong);
+  border-radius: 2px;
+}
+
+.pipDone { background: var(--accent); }
+
+.counter {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin: 0 0 0.5rem;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.375rem, 3.5vw, 1.75rem);
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.body {
+  color: var(--ink-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 1.75rem;
+  flex-wrap: wrap;
+}
+
+.spacer { flex: 1; }
+
+.primary,
+.secondary,
+.quiet {
+  min-height: var(--tap);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary {
+  background: var(--ink-deep);
+  color: var(--on-deep);
+  border-color: var(--ink-deep);
+  font-weight: 500;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.quiet {
+  background: transparent;
+  color: var(--ink-muted);
+  padding-inline: 0.5rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.primary:hover { opacity: 0.9; }
+.secondary:hover, .quiet:hover { background: var(--surface-sunken); }
+
+@media (max-width: 30rem) {
+  /* On a narrow phone the buttons stack full width rather than wrapping into
+     an awkward two-and-one arrangement. */
+  .actions { flex-direction: column-reverse; align-items: stretch; }
+  .spacer { display: none; }
+  .primary, .secondary, .quiet { width: 100%; }
+}

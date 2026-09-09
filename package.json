@@ -1,0 +1,28 @@
+{
+  "name": "client-portal-template",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reusable premium client portal template — Next.js, Supabase, Stripe.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./tests/register.mjs --test --experimental-strip-types tests/*.test.ts",
+    "webhook:stub": "node scripts/webhook-stub.mjs",
+    "test:webhook": "node scripts/webhook-check.mjs",
+    "verify": "npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "^5.9.3"
+  }
+}
