@@ -23,6 +23,7 @@ import { buildDemoView } from "@/lib/demo/dataset";
 import { buildAttention } from "./attention";
 import type {
   PortalApproval,
+  PortalCarePlan,
   PortalPhase,
   PortalView,
 } from "./types";
@@ -365,7 +366,7 @@ export async function loadPortalView(
     carePlan: carePlanRows[0]
       ? {
           status: (str(carePlanRows[0], "status") ??
-            "inactive") as PortalView["carePlan"] extends null ? never : "inactive",
+            "inactive") as PortalCarePlan["status"],
           startedAt: str(carePlanRows[0], "started_at"),
           currentPeriodEnd: str(carePlanRows[0], "current_period_end"),
           cancelAtPeriodEnd: carePlanRows[0].cancel_at_period_end === true,

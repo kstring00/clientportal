@@ -188,14 +188,20 @@ prove that an unreachable datastore returns 500 (so Stripe retries) rather than
 env → migrations → branding → deploy → create client → create project → invite →
 verify).
 
-### 2g. Verification — NOT run
-`npm run typecheck` and `npm run build` have **never been run**. Dependencies are
-installed (`npm install` completed). Expect real errors; at least one is known:
+### 2g. Verification — typecheck PASSES, build NOT run
+`npm run typecheck` **passes clean** (exit 0) as of the latest commit. One bad
+cast in `lib/portal/loader.ts` was found and fixed on the way.
 
-- `lib/portal/loader.ts`, the `carePlan` object — the `status` cast is written as
-  `PortalView["carePlan"] extends null ? never : "inactive"`, which is wrong and
-  will not compile cleanly. Replace with a plain
-  `as PortalCarePlan["status"]` and import the type.
+`npm run build` has **never been run**. Run it early — a Next 16 production build
+catches things `tsc` does not, particularly server/client component boundary
+violations. Two places to look first if it fails:
+
+- `components/portal/PortalShell.tsx` renders `PortalTour` (a client component)
+  and passes it plain data — that should be fine, but it is the least-exercised
+  boundary in the repo.
+- `lib/portal/loader.ts` and `lib/portal/page.ts` both import `server-only`; any
+  accidental import of them from a `"use client"` file will fail the build with a
+  clear message.
 
 ---
 
